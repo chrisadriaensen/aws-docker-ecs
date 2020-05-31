@@ -1,1 +1,60 @@
-#cloudformation TODO
+AWSTemplateFormatVersion: 2010-09-09
+Description: Dummy AWS ECS setup
+
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+  HelloWorldCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: prod
+
+  HelloWorldService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: hello-world-service
+      Cluster: !Ref HelloWorldCluster
+      DesiredCount: 2
+      LaunchType: FARGATE
+      LoadBalancers: xx
+      SchedulingStrategy: REPLICA
+      DeploymentController:
+        Type: ECS
+      TaskDefinition: !Ref HelloWorldTaskDefinition
+
+  HelloWorldTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: hello-world
+      ContainerDefinitions:
+        - Name: hello-world
+          Image: ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/hello-world:latest
+          Cpu: 100
+          Memory: 128
+          Essential: true
+          PortMappings:
+            - Protocol: tcp
+              ContainerPort: 80
+              HostPort: 80
+
+  HelloWorldElasticLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+
+  HelloWorldApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      DefinitionBody:
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: hello-world/oas.yaml
+
+Outputs:
+  HelloWorldApiUrl:
+    Description: API Gateway Endpoint URL
+    Value: !Sub https://${HelloWorldApi}.execute-api.${AWS::Region}.amazonaws.com/prod/hello/
